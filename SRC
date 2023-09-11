@@ -1,0 +1,46 @@
+import groovyx.net.http.RESTClient
+
+class TicketSortingSystem {
+    
+    static final String BASE_URL = 'http://api.yourTicketSystem.com'
+    static final RESTClient restClient = new RESTClient(BASE_URL)
+
+    static void main(String[] args) {
+        TicketSortingSystem ticketSortingSystem = new TicketSortingSystem()
+        ticketSortingSystem.optimizeTicketForwarding()
+    }
+
+    def optimizeTicketForwarding() {
+        def tickets = getTicketsFromDatabase()
+        
+        tickets.each { ticket ->
+            if (ticket.status == 'New') {
+                forwardTicket(ticket)
+            }
+        }
+    }
+
+    def getTicketsFromDatabase() {
+        // Simulated function to get a list of tickets from the database
+        return [
+            [id: 1, status: 'New', priority: 'High', description: 'Issue 1'],
+            [id: 2, status: 'In Progress', priority: 'Medium', description: 'Issue 2'],
+            // ... (more tickets)
+        ]
+    }
+
+    def forwardTicket(ticket) {
+        def response = restClient.post(
+            path: '/forwardTicket',
+            requestContentType: 'application/json',
+            body: [ticketId: ticket.id, priority: ticket.priority, description: ticket.description]
+        )
+
+        if (response.status == 200) {
+            println("Ticket with ID: ${ticket.id} forwarded successfully")
+            // Here, you would add code to update the ticket's status in the database
+        } else {
+            println("Failed to forward ticket with ID: ${ticket.id}. Response code: ${response.status}")
+        }
+    }
+}
