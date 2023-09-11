@@ -1,46 +1,72 @@
 import groovyx.net.http.RESTClient
+import groovy.sql.Sql
 
 class TicketSortingSystem {
-    
+
     static final String BASE_URL = 'http://api.yourTicketSystem.com'
     static final RESTClient restClient = new RESTClient(BASE_URL)
-
+    
+    static final String DB_URL = 'jdbc:yourDatabaseURL'
+    static final String DB_USER = 'yourDatabaseUser'
+    static final String DB_PASSWORD = 'yourDatabasePassword'
+    static final Sql sql = Sql.newInstance(DB_URL, DB_USER, DB_PASSWORD, 'yourJDBCDriver')
+    
     static void main(String[] args) {
         TicketSortingSystem ticketSortingSystem = new TicketSortingSystem()
         ticketSortingSystem.optimizeTicketForwarding()
     }
-
+    
     def optimizeTicketForwarding() {
-        def tickets = getTicketsFromDatabase()
-        
-        tickets.each { ticket ->
-            if (ticket.status == 'New') {
-                forwardTicket(ticket)
+        try {
+            def tickets = getTicketsFromDatabase()
+            
+            tickets.each { ticket ->
+                if (ticket.status == 'New') {
+                    forwardTicket(ticket)
+                }
             }
+        } catch (Exception e) {
+            println("Error encountered: ${e.message}")
         }
     }
-
+    
     def getTicketsFromDatabase() {
-        // Simulated function to get a list of tickets from the database
-        return [
-            [id: 1, status: 'New', priority: 'High', description: 'Issue 1'],
-            [id: 2, status: 'In Progress', priority: 'Medium', description: 'Issue 2'],
-            // ... (more tickets)
-        ]
+        try {
+            def tickets = []
+            sql.eachRow('SELECT id, status, priority, description FROM Tickets WHERE status = \'New\'') { row ->
+                tickets.add([id: row.id, status: row.status, priority: row.priority, description: row.description])
+            }
+            return tickets
+        } catch (SQLException e) {
+            println("Database error: ${e.message}")
+            return []
+        }
     }
-
+    
     def forwardTicket(ticket) {
-        def response = restClient.post(
-            path: '/forwardTicket',
-            requestContentType: 'application/json',
-            body: [ticketId: ticket.id, priority: ticket.priority, description: ticket.description]
-        )
-
-        if (response.status == 200) {
-            println("Ticket with ID: ${ticket.id} forwarded successfully")
-            // Here, you would add code to update the ticket's status in the database
-        } else {
-            println("Failed to forward ticket with ID: ${ticket.id}. Response code: ${response.status}")
+        try {
+            def response = restClient.post(
+                path: '/forwardTicket',
+                requestContentType: 'application/json',
+                body: [ticketId: ticket.id, priority: ticket.priority, description: ticket.description]
+            )
+            
+            if (response.status == 200) {
+                println("Ticket with ID: ${ticket.id} forwarded successfully")
+                updateTicketStatusInDatabase(ticket.id, 'Forwarded')
+            } else {
+                println("Failed to forward ticket with ID: ${ticket.id}. Response code: ${response.status}")
+            }
+        } catch (Exception e) {
+            println("Error forwarding ticket with ID: ${ticket.id}. Error message: ${e.message}")
+        }
+    }
+    
+    def updateTicketStatusInDatabase(int ticketId, String newStatus) {
+        try {
+            sql.execute("UPDATE Tickets SET status = ? WHERE id = ?", [newStatus, ticketId])
+        } catch (SQLException e) {
+            println("Error updating ticket status in the database: ${e.message}")
         }
     }
 }
